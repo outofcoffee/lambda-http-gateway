@@ -20,11 +20,31 @@ func statusHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprintf(w, "ok\n")
 }
 
+func setCorsHeaders(w http.ResponseWriter, req *http.Request) {
+	origin := req.Header.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Requested-With, X-Request-ID, X-Correlation-ID")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Max-Age", "86400")
+}
+
 func handler(w http.ResponseWriter, req *http.Request) {
 	startTime := time.Now()
 	stats.IncActiveRequests()
 	defer stats.DecActiveRequests()
 	log := logrus.WithField("requestId", getRequestId(requestIdHeader, req))
+
+	if permissiveCorsEnabled {
+		setCorsHeaders(w, req)
+		if req.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
 
 	client := req.RemoteAddr
 	log.Debugf("received request %v %v from client %v", req.Method, req.URL, client)

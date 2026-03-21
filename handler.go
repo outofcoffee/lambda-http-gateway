@@ -124,10 +124,6 @@ func parseSubdomainRequest(req *http.Request) (functionName string, path string,
 		host = host[:colonIdx]
 	}
 
-	if baseDomain == "" {
-		return "", "", fmt.Errorf("BASE_DOMAIN must be set when using subdomain routing mode")
-	}
-
 	suffix := "." + baseDomain
 	if !strings.HasSuffix(host, suffix) {
 		return "", "", fmt.Errorf("host %v does not match base domain %v", host, baseDomain)

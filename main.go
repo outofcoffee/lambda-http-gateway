@@ -1,12 +1,19 @@
 package main
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"lambdahttpgw/config"
 	"lambdahttpgw/stats"
 	"net/http"
 )
+
+func validateConfig() {
+	if routingMode == "subdomain" && baseDomain == "" {
+		panic(fmt.Sprintf("BASE_DOMAIN must be set when using subdomain routing mode"))
+	}
+}
 
 var (
 	region          = config.GetRegion()
@@ -19,6 +26,7 @@ var (
 
 func main() {
 	logrus.SetLevel(config.GetConfigLevel())
+	validateConfig()
 	stats.Init()
 
 	http.Handle("/system/metrics", promhttp.Handler())

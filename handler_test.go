@@ -199,21 +199,53 @@ func TestParseSubdomainRequest(t *testing.T) {
 	}
 }
 
-func TestParseSubdomainRequest_BaseDomainRequired(t *testing.T) {
+func TestValidateConfig_SubdomainModeRequiresBaseDomain(t *testing.T) {
+	origMode := routingMode
 	origBaseDomain := baseDomain
-	defer func() { baseDomain = origBaseDomain }()
+	defer func() {
+		routingMode = origMode
+		baseDomain = origBaseDomain
+	}()
 
+	routingMode = "subdomain"
 	baseDomain = ""
 
-	req, _ := http.NewRequest("GET", "/pets", nil)
-	req.Host = "test.live.mocks.cloud"
-	_, _, err := parseSubdomainRequest(req)
-	if err == nil {
-		t.Error("expected error when BASE_DOMAIN is empty")
-	}
-	if !strings.Contains(err.Error(), "BASE_DOMAIN") {
-		t.Errorf("error should mention BASE_DOMAIN, got: %v", err)
-	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when BASE_DOMAIN is empty in subdomain mode")
+		}
+	}()
+	validateConfig()
+}
+
+func TestValidateConfig_SubdomainModeWithBaseDomain(t *testing.T) {
+	origMode := routingMode
+	origBaseDomain := baseDomain
+	defer func() {
+		routingMode = origMode
+		baseDomain = origBaseDomain
+	}()
+
+	routingMode = "subdomain"
+	baseDomain = "live.mocks.cloud"
+
+	// Should not panic
+	validateConfig()
+}
+
+func TestValidateConfig_PathModeNoBaseDomainOk(t *testing.T) {
+	origMode := routingMode
+	origBaseDomain := baseDomain
+	defer func() {
+		routingMode = origMode
+		baseDomain = origBaseDomain
+	}()
+
+	routingMode = "path"
+	baseDomain = ""
+
+	// Should not panic
+	validateConfig()
 }
 
 // --- parseRequest integration tests (routing mode dispatch + prefix) ---

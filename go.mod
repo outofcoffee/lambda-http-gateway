@@ -7,7 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.42.25
 	github.com/google/uuid v1.3.0
 	github.com/prometheus/client_golang v1.11.0
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.8.3
 )
 
 require (
@@ -19,6 +19,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
-	golang.org/x/sys v0.0.0-20210603081109-ebe580a85c40 // indirect
+	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 )

@@ -40,6 +40,25 @@ func GetRequestIdHeader() string {
 	return os.Getenv("REQUEST_ID_HEADER")
 }
 
+// GetRoutingMode returns the routing mode: "path" (default) or "subdomain".
+func GetRoutingMode() string {
+	mode := os.Getenv("ROUTING_MODE")
+	if mode == "" {
+		mode = "path"
+	}
+	return mode
+}
+
+// GetBaseDomain returns the base domain used for subdomain extraction (e.g. "live.mocks.cloud").
+func GetBaseDomain() string {
+	return os.Getenv("BASE_DOMAIN")
+}
+
+// GetFunctionPrefix returns an optional prefix prepended to function names (e.g. "imposter-").
+func GetFunctionPrefix() string {
+	return os.Getenv("FUNCTION_PREFIX")
+}
+
 func isStatsRecorderEnabled() bool {
 	return os.Getenv("STATS_RECORDER") == "true" || isStatsReporterEnabled()
 }

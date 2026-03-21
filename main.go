@@ -22,6 +22,9 @@ import (
 var (
 	region          = config.GetRegion()
 	requestIdHeader = config.GetRequestIdHeader()
+	routingMode     = config.GetRoutingMode()
+	baseDomain      = config.GetBaseDomain()
+	functionPrefix  = config.GetFunctionPrefix()
 	version         = "dev"
 )
 
@@ -34,7 +37,7 @@ func main() {
 	http.HandleFunc("/", handler)
 
 	port := config.GetPort()
-	logrus.Infof("starting http lambda gateway %v for region %v on port %v", version, region, port)
+	logrus.Infof("starting http lambda gateway %v for region %v on port %v (routing: %v)", version, region, port, routingMode)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		panic(err)
@@ -95,16 +98,18 @@ func getRequestId(headerName string, req *http.Request) string {
 }
 
 func parseRequest(req *http.Request) (functionName string, path string, headers *map[string]string, body *[]byte, err error) {
-	splitPath := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/"), "/", 2)
-
-	path = "/"
-	if len(splitPath) >= 1 && splitPath[0] != "" {
-		functionName = splitPath[0]
-		if len(splitPath) >= 2 {
-			path = "/" + splitPath[1]
-		}
+	if routingMode == "subdomain" {
+		functionName, path, err = parseSubdomainRequest(req)
 	} else {
-		return "", "", nil, nil, fmt.Errorf("path must include function name and request path")
+		functionName, path, err = parsePathRequest(req)
+	}
+	if err != nil {
+		return "", "", nil, nil, err
+	}
+
+	// Apply function prefix if configured
+	if functionPrefix != "" {
+		functionName = functionPrefix + functionName
 	}
 
 	requestHeaders := make(map[string]string)
@@ -117,6 +122,51 @@ func parseRequest(req *http.Request) (functionName string, path string, headers 
 		return "", "", nil, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 	return functionName, path, &requestHeaders, &requestBody, err
+}
+
+// parsePathRequest extracts the function name from the first path segment (existing behavior).
+func parsePathRequest(req *http.Request) (functionName string, path string, err error) {
+	splitPath := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/"), "/", 2)
+
+	path = "/"
+	if len(splitPath) >= 1 && splitPath[0] != "" {
+		functionName = splitPath[0]
+		if len(splitPath) >= 2 {
+			path = "/" + splitPath[1]
+		}
+	} else {
+		return "", "", fmt.Errorf("path must include function name and request path")
+	}
+	return functionName, path, nil
+}
+
+// parseSubdomainRequest extracts the function name from the Host header subdomain.
+func parseSubdomainRequest(req *http.Request) (functionName string, path string, err error) {
+	host := req.Host
+	// Strip port if present
+	if colonIdx := strings.IndexByte(host, ':'); colonIdx != -1 {
+		host = host[:colonIdx]
+	}
+
+	if baseDomain == "" {
+		return "", "", fmt.Errorf("BASE_DOMAIN must be set when using subdomain routing mode")
+	}
+
+	suffix := "." + baseDomain
+	if !strings.HasSuffix(host, suffix) {
+		return "", "", fmt.Errorf("host %v does not match base domain %v", host, baseDomain)
+	}
+
+	functionName = strings.TrimSuffix(host, suffix)
+	if functionName == "" {
+		return "", "", fmt.Errorf("no subdomain found in host %v", host)
+	}
+
+	path = req.URL.Path
+	if path == "" {
+		path = "/"
+	}
+	return functionName, path, nil
 }
 
 func invoke(

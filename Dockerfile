@@ -1,4 +1,4 @@
-FROM golang:1.17 as build
+FROM golang:1.24 as build
 
 ARG GOARCH=amd64
 

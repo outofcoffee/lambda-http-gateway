@@ -2,3 +2,4 @@
 .idea/
 lambdahttpgw
 dist/
+.claude/*.local.*

@@ -1,3 +1,4 @@
+version: 2
 project_name: lambdahttpgw
 before:
   hooks:
@@ -17,12 +18,16 @@ builds:
       - arm
       - arm64
 archives:
-  - replacements:
-      darwin: macOS
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "linux" }}Linux
+      {{- else if eq .Os "windows" }}Windows
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
         format: zip
@@ -38,28 +43,10 @@ changelog:
       - '^test:'
 brews:
   -
-    # Name template of the recipe
-    # Default to project name
     name: lambdahttpgw
-
-    # GOARM to specify which 32-bit arm version to use if there are multiple versions
-    # from the build section. Brew formulas support atm only one 32-bit version.
-    # Default is 6 for all artifacts or each id if there a multiple versions.
     goarm: 6
-
-    # NOTE: make sure the url_template, the token and given repo (github or gitlab) owner and name are from the
-    # same kind. We will probably unify this in the next major version like it is done with scoop.
-
-    # Git author used to commit to the repository.
-    # Defaults are shown.
     commit_author:
       name: coffeebot
       email: outofcoffee@gmail.com
-
-    # Your app's homepage.
-    # Default is empty.
     homepage: "https://github.com/outofcoffee/http-lambda-gateway"
-
-    # Template of your app's description.
-    # Default is empty.
     description: "Simple HTTP gateway for AWS Lambda."

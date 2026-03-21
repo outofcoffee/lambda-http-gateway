@@ -30,19 +30,26 @@ Call the Lambda function via the gateway:
 
 The Lambda function receives events in the standard AWS API Gateway JSON format, and is expected to respond in kind.
 
+The gateway also supports [subdomain-based routing](./docs/routing.md), where the function name is extracted from the `Host` header instead of the path.
+
 ## Configuration
 
 Environment variables:
 
-| Variable              | Meaning                                                                                         | Default     | Example               |
-|-----------------------|-------------------------------------------------------------------------------------------------|-------------|-----------------------|
-| AWS_REGION            | AWS region in which to connect to Lambda functions.                                             | `eu-west-1` | `us-east-1`           |
-| LOG_LEVEL             | Log level (trace, debug, info, warn, error).                                                    | `debug`     | `warn`                |
-| PORT                  | Port on which to listen.                                                                        | `8090`      | `8080`                |
-| REQUEST_ID_HEADER     | Name of request header to use as request ID for logging. If absent, a UUID will be used.        | Empty       | `x-correlation-id`    |
-| STATS_RECORDER        | Whether to record number of hits for each function.                                             | `false`     | `true`                |
-| STATS_REPORT_INTERVAL | The frequency with which stats should be reported, if enabled.                                  | `5s`        | `2m`                  |
-| STATS_REPORT_URL      | URL to which stats should be reported. If not empty, hits are recorded for each function name.  | Empty       | `https://example.com` |
+| Variable              | Meaning                                                                                         | Default     | Example                            |
+|-----------------------|-------------------------------------------------------------------------------------------------|-------------|------------------------------------|
+| AWS_REGION            | AWS region in which to connect to Lambda functions.                                             | `eu-west-1` | `us-east-1`                        |
+| BASE_DOMAIN           | Base domain for subdomain routing. Required when `ROUTING_MODE=subdomain`.                      | Empty       | `live.mocks.cloud`                 |
+| FUNCTION_PREFIX       | Optional prefix prepended to resolved function names before invoking Lambda.                    | Empty       | `imposter-`                        |
+| LOG_LEVEL             | Log level (trace, debug, info, warn, error).                                                    | `debug`     | `warn`                             |
+| PORT                  | Port on which to listen.                                                                        | `8090`      | `8080`                             |
+| REQUEST_ID_HEADER     | Name of request header to use as request ID for logging. If absent, a UUID will be used.        | Empty       | `x-correlation-id`                 |
+| ROUTING_MODE          | Routing mode: `path` extracts function name from URL path, `subdomain` from the Host header.    | `path`      | `subdomain`                        |
+| STATS_RECORDER        | Whether to record number of hits for each function.                                             | `false`     | `true`                             |
+| STATS_REPORT_INTERVAL | The frequency with which stats should be reported, if enabled.                                  | `5s`        | `2m`                               |
+| STATS_REPORT_URL      | URL to which stats should be reported. If not empty, hits are recorded for each function name.  | Empty       | `https://example.com`              |
+
+See [Routing](./docs/routing.md) for details on path-based vs subdomain-based routing.
 
 ## Build
 

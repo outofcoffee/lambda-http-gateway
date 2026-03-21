@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.2.0] - 2026-03-21
+### Added
+- feat: add subdomain-based routing and function prefix support (#1)
+
+### Changed
+- build: adds since release config
+- build: ignore local agent settings
+- chore(ci): bump actions to latest stable
+- docs: adds changelog
+
 ## [0.1.9] - 2022-01-07
 ### Added
 - feat: replaces bespoke stats endpoint with Prometheus metrics.
@@ -56,5 +66,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 - initial commit.
-
-

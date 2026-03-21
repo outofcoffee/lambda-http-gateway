@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.2.1] - 2026-03-21
+### Changed
+- build(deps): bump github.com/prometheus/client_golang from 1.11.0 to 1.11.1
+- build(deps): bump github.com/sirupsen/logrus from 1.8.1 to 1.8.3
+- build(deps): bump golang.org/x/sys from 0.0.0-20210603081109 to 0.1.0
+- build(deps): bump google.golang.org/protobuf (#2)
+
 ## [0.2.0] - 2026-03-21
 ### Added
 - feat: add subdomain-based routing and function prefix support (#1)

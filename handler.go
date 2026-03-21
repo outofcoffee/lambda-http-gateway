@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/lambda"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -151,13 +150,6 @@ func invoke(
 ) (statusCode int, responseBody *[]byte, responseHeaders *map[string]string, err error) {
 	log.Debugf("invoking function %v with %v %v [body: %v bytes]", functionName, httpMethod, path, len(*requestBody))
 
-	// Create Lambda service client
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
-	client := lambda.New(sess, &aws.Config{Region: aws.String(region)})
-
 	encodedBody := b64.StdEncoding.EncodeToString(*requestBody)
 	request := events.APIGatewayProxyRequest{
 		HTTPMethod:      httpMethod,
@@ -172,7 +164,7 @@ func invoke(
 		return 0, nil, nil, fmt.Errorf("error marshalling request: %v", err)
 	}
 
-	result, err := client.Invoke(&lambda.InvokeInput{FunctionName: aws.String(functionName), Payload: payload})
+	result, err := lambdaClient.Invoke(&lambda.InvokeInput{FunctionName: aws.String(functionName), Payload: payload})
 	if err != nil {
 		return 0, nil, nil, fmt.Errorf("error calling %v: %v", functionName, err)
 	}

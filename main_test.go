@@ -52,10 +52,10 @@ func TestParsePathRequest(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name:             "function with query string in path",
+			name:             "function with query string in URL",
 			path:             "/myFunction/path?key=value",
 			expectedFunction: "myFunction",
-			expectedPath:     "/path?key=value",
+			expectedPath:     "/path",
 		},
 	}
 
@@ -154,7 +154,7 @@ func TestParseSubdomainRequest(t *testing.T) {
 			host:        "live.mocks.cloud",
 			path:        "/pets",
 			expectErr:   true,
-			errContains: "no subdomain",
+			errContains: "does not match base domain",
 		},
 		{
 			name:        "wrong domain entirely",

@@ -117,9 +117,12 @@ func parseRequest(req *http.Request) (functionName string, path string, headers 
 		requestHeaders[requestHeaderKey] = requestHeaderValue[0]
 	}
 
-	requestBody, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return "", "", nil, nil, fmt.Errorf("error parsing request body: %v", err)
+	var requestBody []byte
+	if req.Body != nil {
+		requestBody, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return "", "", nil, nil, fmt.Errorf("error parsing request body: %v", err)
+		}
 	}
 	return functionName, path, &requestHeaders, &requestBody, err
 }

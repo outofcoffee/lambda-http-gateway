@@ -2,10 +2,45 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"lambdahttpgw/stats"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/lambda"
+	"github.com/sirupsen/logrus"
 )
+
+func TestMain(m *testing.M) {
+	stats.Init()
+	os.Exit(m.Run())
+}
+
+// setupMockLambda starts an HTTP server that mimics the AWS Lambda Invoke API
+// and configures the global lambdaClient to use it.
+func setupMockLambda(handler http.HandlerFunc) (*httptest.Server, func()) {
+	server := httptest.NewServer(handler)
+	origClient := lambdaClient
+
+	sess := session.Must(session.NewSession(&aws.Config{
+		Region:      aws.String("us-east-1"),
+		Endpoint:    aws.String(server.URL),
+		Credentials: credentials.NewStaticCredentials("fake", "fake", "fake"),
+	}))
+	lambdaClient = lambda.New(sess)
+
+	return server, func() {
+		lambdaClient = origClient
+		server.Close()
+	}
+}
 
 // --- parsePathRequest tests ---
 
@@ -547,5 +582,488 @@ func TestParseRequest_DifferentMethods(t *testing.T) {
 				t.Errorf("path: got %q, want %q", path, "/path")
 			}
 		})
+	}
+}
+
+// --- statusHandler tests ---
+
+func TestStatusHandler(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/system/status", nil)
+	statusHandler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status code: got %d, want %d", w.Code, http.StatusOK)
+	}
+	if w.Body.String() != "ok\n" {
+		t.Errorf("body: got %q, want %q", w.Body.String(), "ok\n")
+	}
+}
+
+// --- getRequestId tests ---
+
+func TestGetRequestId_FromHeader(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("X-Request-ID", "my-id-123")
+
+	id := getRequestId("X-Request-ID", req)
+	if id != "my-id-123" {
+		t.Errorf("expected my-id-123, got %q", id)
+	}
+}
+
+func TestGetRequestId_GeneratesUUID(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+
+	id := getRequestId("", req)
+	if id == "" {
+		t.Error("expected a generated UUID, got empty")
+	}
+	// UUID format: 8-4-4-4-12
+	if len(id) != 36 {
+		t.Errorf("expected UUID length 36, got %d", len(id))
+	}
+}
+
+func TestGetRequestId_MissingHeaderGeneratesUUID(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	// Header name is set but header value is absent
+	id := getRequestId("X-Missing-Header", req)
+	if id == "" {
+		t.Error("expected a generated UUID, got empty")
+	}
+	if len(id) != 36 {
+		t.Errorf("expected UUID length 36, got %d", len(id))
+	}
+}
+
+// --- setCorsHeaders tests ---
+
+func TestSetCorsHeaders_WithOrigin(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+
+	setCorsHeaders(w, req)
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://example.com" {
+		t.Errorf("Allow-Origin: got %q, want %q", got, "https://example.com")
+	}
+	if got := w.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Errorf("Allow-Credentials: got %q, want %q", got, "true")
+	}
+	if got := w.Header().Get("Access-Control-Allow-Methods"); got == "" {
+		t.Error("Allow-Methods should not be empty")
+	}
+	if got := w.Header().Get("Access-Control-Allow-Headers"); got == "" {
+		t.Error("Allow-Headers should not be empty")
+	}
+	if !strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
+		t.Error("Allow-Headers should include Authorization")
+	}
+	if !strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), "Content-Type") {
+		t.Error("Allow-Headers should include Content-Type")
+	}
+	if got := w.Header().Get("Access-Control-Max-Age"); got != "86400" {
+		t.Errorf("Max-Age: got %q, want %q", got, "86400")
+	}
+}
+
+func TestSetCorsHeaders_NoOrigin(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/", nil)
+
+	setCorsHeaders(w, req)
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("Allow-Origin: got %q, want %q", got, "*")
+	}
+}
+
+// --- sendResponse tests ---
+
+func TestSendResponse(t *testing.T) {
+	w := httptest.NewRecorder()
+	log := logrus.WithField("test", true)
+
+	headers := map[string]string{
+		"Content-Type":  "application/json",
+		"X-Custom":      "value",
+	}
+	body := []byte(`{"result":"ok"}`)
+
+	err := sendResponse(log, w, &headers, http.StatusOK, &body, "127.0.0.1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if w.Code != http.StatusOK {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusOK)
+	}
+	if w.Body.String() != `{"result":"ok"}` {
+		t.Errorf("body: got %q", w.Body.String())
+	}
+	if got := w.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type: got %q, want %q", got, "application/json")
+	}
+	if got := w.Header().Get("X-Custom"); got != "value" {
+		t.Errorf("X-Custom: got %q, want %q", got, "value")
+	}
+}
+
+func TestSendResponse_NonOkStatus(t *testing.T) {
+	w := httptest.NewRecorder()
+	log := logrus.WithField("test", true)
+
+	headers := map[string]string{}
+	body := []byte("not found")
+
+	err := sendResponse(log, w, &headers, http.StatusNotFound, &body, "127.0.0.1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
+func TestSendResponse_EmptyBody(t *testing.T) {
+	w := httptest.NewRecorder()
+	log := logrus.WithField("test", true)
+
+	headers := map[string]string{}
+	body := []byte{}
+
+	err := sendResponse(log, w, &headers, http.StatusNoContent, &body, "127.0.0.1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if w.Code != http.StatusNoContent {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusNoContent)
+	}
+}
+
+// --- handler CORS integration tests ---
+
+func TestHandler_CorsPreflightWhenEnabled(t *testing.T) {
+	origCors := permissiveCorsEnabled
+	defer func() { permissiveCorsEnabled = origCors }()
+
+	permissiveCorsEnabled = true
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("OPTIONS", "/someFunction/path", nil)
+	req.Header.Set("Origin", "https://myapp.example.com")
+
+	handler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusNoContent)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://myapp.example.com" {
+		t.Errorf("Allow-Origin: got %q, want %q", got, "https://myapp.example.com")
+	}
+}
+
+func TestHandler_CorsDisabled_NoHeaders(t *testing.T) {
+	origCors := permissiveCorsEnabled
+	origMode := routingMode
+	defer func() {
+		permissiveCorsEnabled = origCors
+		routingMode = origMode
+	}()
+
+	permissiveCorsEnabled = false
+	routingMode = "path"
+
+	w := httptest.NewRecorder()
+	// Use root path to trigger 400 before lambda invocation
+	req := httptest.NewRequest("OPTIONS", "/", nil)
+	req.Header.Set("Origin", "https://myapp.example.com")
+
+	handler(w, req)
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("Allow-Origin should be empty when CORS disabled, got %q", got)
+	}
+}
+
+func TestHandler_CorsHeadersOnNonPreflight(t *testing.T) {
+	origCors := permissiveCorsEnabled
+	origMode := routingMode
+	defer func() {
+		permissiveCorsEnabled = origCors
+		routingMode = origMode
+	}()
+
+	permissiveCorsEnabled = true
+	routingMode = "path"
+
+	w := httptest.NewRecorder()
+	// Use root path so handler returns 400 before reaching Lambda invocation
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://myapp.example.com")
+
+	handler(w, req)
+
+	// CORS headers should still be set even when the request fails
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://myapp.example.com" {
+		t.Errorf("Allow-Origin: got %q, want %q", got, "https://myapp.example.com")
+	}
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandler_BadRequest_EmptyPath(t *testing.T) {
+	origCors := permissiveCorsEnabled
+	origMode := routingMode
+	defer func() {
+		permissiveCorsEnabled = origCors
+		routingMode = origMode
+	}()
+
+	permissiveCorsEnabled = false
+	routingMode = "path"
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/", nil)
+
+	handler(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+// --- invoke tests ---
+
+func TestInvoke_Success(t *testing.T) {
+	lambdaResp := events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Headers:    map[string]string{"Content-Type": "application/json"},
+		Body:       `{"message":"hello"}`,
+	}
+	respPayload, _ := json.Marshal(lambdaResp)
+
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respPayload)
+	}))
+	defer cleanup()
+
+	log := logrus.WithField("test", true)
+	headers := map[string]string{"Content-Type": "application/json"}
+	body := []byte(`{"key":"value"}`)
+
+	code, respBody, respHeaders, err := invoke(log, "testFunc", "POST", "/path", &headers, &body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if code != 200 {
+		t.Errorf("status: got %d, want 200", code)
+	}
+	if string(*respBody) != `{"message":"hello"}` {
+		t.Errorf("body: got %q", string(*respBody))
+	}
+	if (*respHeaders)["Content-Type"] != "application/json" {
+		t.Errorf("Content-Type header: got %q", (*respHeaders)["Content-Type"])
+	}
+}
+
+func TestInvoke_Base64Response(t *testing.T) {
+	lambdaResp := events.APIGatewayProxyResponse{
+		StatusCode:      200,
+		Headers:         map[string]string{},
+		Body:            "aGVsbG8=", // "hello" base64
+		IsBase64Encoded: true,
+	}
+	respPayload, _ := json.Marshal(lambdaResp)
+
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respPayload)
+	}))
+	defer cleanup()
+
+	log := logrus.WithField("test", true)
+	headers := map[string]string{}
+	body := []byte{}
+
+	code, respBody, _, err := invoke(log, "testFunc", "GET", "/path", &headers, &body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if code != 200 {
+		t.Errorf("status: got %d, want 200", code)
+	}
+	if string(*respBody) != "hello" {
+		t.Errorf("body: got %q, want %q", string(*respBody), "hello")
+	}
+}
+
+func TestInvoke_LambdaError(t *testing.T) {
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer cleanup()
+
+	log := logrus.WithField("test", true)
+	headers := map[string]string{}
+	body := []byte{}
+
+	_, _, _, err := invoke(log, "testFunc", "GET", "/path", &headers, &body)
+	if err == nil {
+		t.Error("expected error for failed Lambda invocation")
+	}
+}
+
+func TestInvoke_InvalidResponse(t *testing.T) {
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`not valid json`))
+	}))
+	defer cleanup()
+
+	log := logrus.WithField("test", true)
+	headers := map[string]string{}
+	body := []byte{}
+
+	_, _, _, err := invoke(log, "testFunc", "GET", "/path", &headers, &body)
+	if err == nil {
+		t.Error("expected error for invalid response payload")
+	}
+}
+
+func TestInvoke_BadBase64Response(t *testing.T) {
+	lambdaResp := events.APIGatewayProxyResponse{
+		StatusCode:      200,
+		Headers:         map[string]string{},
+		Body:            "!!!not-base64!!!",
+		IsBase64Encoded: true,
+	}
+	respPayload, _ := json.Marshal(lambdaResp)
+
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respPayload)
+	}))
+	defer cleanup()
+
+	log := logrus.WithField("test", true)
+	headers := map[string]string{}
+	body := []byte{}
+
+	_, _, _, err := invoke(log, "testFunc", "GET", "/path", &headers, &body)
+	if err == nil {
+		t.Error("expected error for bad base64 body")
+	}
+}
+
+// --- full handler integration tests ---
+
+func TestHandler_SuccessfulInvocation(t *testing.T) {
+	lambdaResp := events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Headers:    map[string]string{"X-Custom": "resp-value"},
+		Body:       `{"result":"ok"}`,
+	}
+	respPayload, _ := json.Marshal(lambdaResp)
+
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respPayload)
+	}))
+	defer cleanup()
+
+	origCors := permissiveCorsEnabled
+	origMode := routingMode
+	defer func() {
+		permissiveCorsEnabled = origCors
+		routingMode = origMode
+	}()
+	permissiveCorsEnabled = false
+	routingMode = "path"
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/myFunction/path", nil)
+
+	handler(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("status: got %d, want 200", w.Code)
+	}
+	if w.Body.String() != `{"result":"ok"}` {
+		t.Errorf("body: got %q", w.Body.String())
+	}
+	if got := w.Header().Get("X-Custom"); got != "resp-value" {
+		t.Errorf("X-Custom: got %q, want %q", got, "resp-value")
+	}
+}
+
+func TestHandler_LambdaInvocationError(t *testing.T) {
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer cleanup()
+
+	origCors := permissiveCorsEnabled
+	origMode := routingMode
+	defer func() {
+		permissiveCorsEnabled = origCors
+		routingMode = origMode
+	}()
+	permissiveCorsEnabled = false
+	routingMode = "path"
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/myFunction/path", nil)
+
+	handler(w, req)
+
+	if w.Code != http.StatusBadGateway {
+		t.Errorf("status: got %d, want %d", w.Code, http.StatusBadGateway)
+	}
+}
+
+func TestHandler_CorsWithSuccessfulInvocation(t *testing.T) {
+	lambdaResp := events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Headers:    map[string]string{},
+		Body:       "ok",
+	}
+	respPayload, _ := json.Marshal(lambdaResp)
+
+	_, cleanup := setupMockLambda(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respPayload)
+	}))
+	defer cleanup()
+
+	origCors := permissiveCorsEnabled
+	origMode := routingMode
+	defer func() {
+		permissiveCorsEnabled = origCors
+		routingMode = origMode
+	}()
+	permissiveCorsEnabled = true
+	routingMode = "path"
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/myFunction/api", nil)
+	req.Header.Set("Origin", "https://app.example.com")
+
+	handler(w, req)
+
+	if w.Code != 200 {
+		t.Errorf("status: got %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
+		t.Errorf("Allow-Origin: got %q, want %q", got, "https://app.example.com")
 	}
 }

@@ -92,9 +92,15 @@ func GetAllStats() map[string]*statsHolder {
 }
 
 func IncActiveRequests() {
+	if activeReqCh == nil {
+		return
+	}
 	activeReqCh <- 1
 }
 
 func DecActiveRequests() {
+	if activeReqCh == nil {
+		return
+	}
 	activeReqCh <- -1
 }

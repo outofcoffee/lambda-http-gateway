@@ -52,6 +52,8 @@ Environment variables:
 
 See [Routing](./docs/routing.md) for details on path-based vs subdomain-based routing.
 
+See [CORS](./docs/cors.md) for details on permissive CORS support.
+
 ## Build
 
 Prerequisites:

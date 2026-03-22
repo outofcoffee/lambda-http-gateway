@@ -3,3 +3,6 @@
 lambdahttpgw
 dist/
 .claude/*.local.*
+
+# Test coverage output
+*.out

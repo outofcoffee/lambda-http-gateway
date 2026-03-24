@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.3.0] - 2026-03-24
+### Added
+- feat: add permissive CORS support with configurable origin handling (#6)
+
 ## [0.2.2] - 2026-03-21
 ### Changed
 - build: bump Go version to 1.24 in Dockerfile and go.mod

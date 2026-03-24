@@ -11,10 +11,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 )
 
 func TestMain(m *testing.M) {
@@ -28,12 +27,11 @@ func setupMockLambda(handler http.HandlerFunc) (*httptest.Server, func()) {
 	server := httptest.NewServer(handler)
 	origClient := lambdaClient
 
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String("us-east-1"),
-		Endpoint:    aws.String(server.URL),
-		Credentials: credentials.NewStaticCredentials("fake", "fake", "fake"),
-	}))
-	lambdaClient = lambda.New(sess)
+	lambdaClient = lambda.New(lambda.Options{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String(server.URL),
+		Credentials:  credentials.NewStaticCredentialsProvider("fake", "fake", "fake"),
+	})
 
 	return server, func() {
 		lambdaClient = origClient

@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/lambda"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"lambdahttpgw/config"
@@ -26,17 +26,20 @@ var (
 	functionPrefix        = config.GetFunctionPrefix()
 	permissiveCorsEnabled = config.IsPermissiveCorsEnabled()
 	version               = "dev"
-	lambdaClient          *lambda.Lambda
+	lambdaClient          *lambda.Client
 )
 
 func main() {
 	logrus.SetLevel(config.GetConfigLevel())
 	validateConfig()
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	lambdaClient = lambda.New(sess, &aws.Config{Region: aws.String(region)})
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("unable to load AWS config: %v", err))
+	}
+	lambdaClient = lambda.NewFromConfig(cfg)
 
 	stats.Init()
 
@@ -46,7 +49,7 @@ func main() {
 
 	port := config.GetPort()
 	logrus.Infof("starting http lambda gateway %v for region %v on port %v (routing: %v)", version, region, port, routingMode)
-	err := http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		panic(err)
 	}

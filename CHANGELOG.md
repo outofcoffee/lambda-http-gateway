@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.3.1] - 2026-03-24
+### Changed
+- chore(deps): upgrade AWS SDK for Go from v1 to v2 (#8)
+- chore: upgrade GitHub Actions to latest stable versions (#7)
+
 ## [0.3.0] - 2026-03-24
 ### Added
 - feat: add permissive CORS support with configurable origin handling (#6)

@@ -44,7 +44,6 @@ changelog:
 homebrew_casks:
   -
     name: lambdahttpgw
-    goarm: 6
     commit_author:
       name: coffeebot
       email: outofcoffee@gmail.com

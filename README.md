@@ -40,6 +40,7 @@ Environment variables:
 |-----------------------|-------------------------------------------------------------------------------------------------|-------------|------------------------------------|
 | AWS_REGION            | AWS region in which to connect to Lambda functions.                                             | `eu-west-1` | `us-east-1`                        |
 | BASE_DOMAIN           | Base domain for subdomain routing. Required when `ROUTING_MODE=subdomain`.                      | Empty       | `live.mocks.cloud`                 |
+| CORS_PERMISSIVE       | Enable permissive CORS: reflects the request Origin, allows common headers (Accept, Authorization, Content-Type etc.) and credentials. | `false`     | `true`                             |
 | FUNCTION_PREFIX       | Optional prefix prepended to resolved function names before invoking Lambda.                    | Empty       | `imposter-`                        |
 | LOG_LEVEL             | Log level (trace, debug, info, warn, error).                                                    | `debug`     | `warn`                             |
 | PORT                  | Port on which to listen.                                                                        | `8090`      | `8080`                             |
@@ -50,6 +51,8 @@ Environment variables:
 | STATS_REPORT_URL      | URL to which stats should be reported. If not empty, hits are recorded for each function name.  | Empty       | `https://example.com`              |
 
 See [Routing](./docs/routing.md) for details on path-based vs subdomain-based routing.
+
+See [CORS](./docs/cors.md) for details on permissive CORS support.
 
 ## Build
 

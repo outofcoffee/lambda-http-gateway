@@ -19,13 +19,14 @@ func validateConfig() {
 }
 
 var (
-	region          = config.GetRegion()
-	requestIdHeader = config.GetRequestIdHeader()
-	routingMode     = config.GetRoutingMode()
-	baseDomain      = config.GetBaseDomain()
-	functionPrefix  = config.GetFunctionPrefix()
-	version         = "dev"
-	lambdaClient    *lambda.Lambda
+	region                = config.GetRegion()
+	requestIdHeader       = config.GetRequestIdHeader()
+	routingMode           = config.GetRoutingMode()
+	baseDomain            = config.GetBaseDomain()
+	functionPrefix        = config.GetFunctionPrefix()
+	permissiveCorsEnabled = config.IsPermissiveCorsEnabled()
+	version               = "dev"
+	lambdaClient          *lambda.Lambda
 )
 
 func main() {

@@ -59,6 +59,10 @@ func GetFunctionPrefix() string {
 	return os.Getenv("FUNCTION_PREFIX")
 }
 
+func IsPermissiveCorsEnabled() bool {
+	return os.Getenv("CORS_PERMISSIVE") == "true"
+}
+
 func isStatsRecorderEnabled() bool {
 	return os.Getenv("STATS_RECORDER") == "true" || isStatsReporterEnabled()
 }

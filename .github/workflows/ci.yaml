@@ -52,6 +52,9 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: outofcoffee/lambdahttpgw
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
         if: startsWith(github.ref, 'refs/tags/')

@@ -6,3 +6,6 @@ dist/
 
 # Test coverage output
 *.out
+
+# One-off scripts
+scripts/

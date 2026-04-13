@@ -20,6 +20,9 @@ jobs:
       - name: Build
         run: go build
 
+      - name: Integration test
+        run: ./integration/test.sh
+
       - name: Dry run
         uses: goreleaser/goreleaser-action@v7
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}

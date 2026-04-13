@@ -1,0 +1,28 @@
+services:
+  ministack:
+    image: ministackorg/ministack
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        GOARCH: ${GOARCH:-amd64}
+    ports:
+      - "8090:8090"
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_REGION=us-east-1
+      - AWS_ENDPOINT_URL=http://ministack:4566
+      - LOG_LEVEL=debug
+    depends_on:
+      ministack:
+        condition: service_healthy

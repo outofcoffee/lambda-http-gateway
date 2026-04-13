@@ -1,4 +1,4 @@
-FROM golang:1.24 as build
+FROM golang:1.24 AS build
 
 ARG GOARCH=amd64
 
@@ -9,10 +9,10 @@ COPY go.mod .
 RUN go mod download
 
 COPY . .
-RUN GOOS=linux GOARCH=${GOARCH} go build -ldflags="-w -s"
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build -ldflags="-w -s"
 RUN chmod +x /go/src/app/lambdahttpgw
 
-FROM debian:11-slim
+FROM debian:12-slim
 
 RUN apt-get update \
     && apt-get install -y ca-certificates \
